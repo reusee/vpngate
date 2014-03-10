@@ -6,10 +6,12 @@ import (
   "io"
   "io/ioutil"
   "log"
+  "net/http"
   "os"
   "os/exec"
   "strconv"
   "strings"
+  "time"
 )
 
 func main() {
@@ -42,7 +44,8 @@ func main() {
     }
     country := fields[6]
     sessions, _ := strconv.Atoi(fields[7])
-    fmt.Printf("%2d %s %2d sessions, %5dG traffic, %6d users, %2dM speed\n", n, country, sessions, traffic/1000000000, users, speed/1000000)
+    op := fields[12]
+    fmt.Printf("%2d %s %3d sessions, %5dG traffic, %7d users, %2dM speed, %s\n", n, country, sessions, traffic/1000000000, users, speed/1000000, op)
     n++
     config := fields[14]
     configs = append(configs, config)
@@ -65,5 +68,23 @@ func main() {
     log.Fatal(err)
   }
   go io.Copy(os.Stdout, stdout)
+  go func() {
+    for {
+      time.Sleep(time.Minute * 1)
+      url := "http://www.vpngate.net/api/iphone/"
+      resp, err := http.Get(url)
+      if err != nil {
+        continue
+      }
+      f, err := os.OpenFile("csv.tmp", os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0666)
+      if err != nil {
+        log.Fatal(err)
+      }
+      io.Copy(f, resp.Body)
+      f.Close()
+      resp.Body.Close()
+      os.Rename("csv.tmp", "csv")
+    }
+  }()
   cmd.Run()
 }
